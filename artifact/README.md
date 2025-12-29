@@ -66,7 +66,7 @@ The register setting functionality is implemented in `RegSetter.run`. The core f
 The function/syscall calling functionalities are implemented in `SysCaller` and `FuncCaller`, where `SysCaller` relies on `FuncCaller`, it only handles some convenient functions like `execve`, the actual logic happens in `FuncCaller`. Its `_func_call` function is the way handles all kinda of different calling conventions. It will handle the stack cleanup or return register setting by querying the calling convention.
 
 ## Sample Usages
-```
+```python
 import angr
 import angrop
 from multiprocessing import cpu_count
@@ -91,7 +91,7 @@ And `chain` is a `RopChain` object, you can do `chain.payload_code()` to get pyt
 Instead, `concrete_exec_til_addr` will execute the chain until the `PC` becomes the target value (here `0xfacefeed`).
 
 Another sample usage is here:
-```
+```python
 [ins] In [10]: chain = rop.write_to_mem(0x41414141, b"/bin/sh\x00") + rop.func_call(0xfacefeed, [0x41414141, 0, 0])
 
 [ins] In [11]: chain.pp()
@@ -117,7 +117,7 @@ Another sample usage is here:
 This above simulates an `execve` example and demonstrates its chainability.
 
 Yet another example is here:
-```
+```python
 [ins] In [15]: chain = rop.execve()
 
 [ins] In [16]: chain.pp()

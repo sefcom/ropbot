@@ -1,0 +1,98 @@
+#!/usr/bin/env python3
+import os
+
+def sanitize_args(dataset_dir, tool, arch, target):
+    # sanitize dataset_dir
+    assert os.path.exists(dataset_dir), f"{dataset_dir} does not exist!"
+    assert os.path.exists(os.path.join(dataset_dir, "x64_dataset")), f"{dataset_dir} is not complete!"
+
+    # sanity check arch
+    if tool not in ('ropbot', 'riscyrop'):
+        assert arch == 'x64'
+    elif tool == 'riscyrop':
+        assert arch in ('aarch64', 'riscv')
+    elif tool == 'ropbot':
+        assert arch in ('x64', 'mipsel', 'aarch64', 'arm', 'riscv')
+    else:
+        raise ValueError("?")
+
+    assert tool in ('ropbot', 'exrop', 'crackers', 'sgc', 'riscyrop')
+    assert target in ('facefeed', 'mmap', 'execve', 'dup', 'riscyrop', 'test') or 'ablation' in target
+
+def get_bin_folder(dataset_dir, arch, target):
+    dataset = None
+    if arch == 'x64':
+        if target == 'dup':
+            dataset = 'dup_dataset'
+        elif target == 'mmap':
+            dataset = 'mmap_dataset'
+        elif target == 'execve':
+            dataset = 'syscall_dataset'
+        elif target in ['facefeed', 'test']:
+            dataset = 'x64_dataset'
+        elif 'ablation' in target:
+            if 'facefeed' in target:
+                dataset = 'x64_dataset'
+            elif 'execve' in target:
+                dataset = 'syscall_dataset'
+    elif arch in ('arm', 'mipsel', 'riscv'):
+        dataset = f'{arch}_dataset'
+    elif arch == 'aarch64':
+        dataset = 'aarch64_no_pac_dataset'
+    assert dataset is not None
+    dataset_path = os.path.abspath(os.path.join(dataset_dir, dataset))
+    assert os.path.exists(dataset_path)
+    return dataset_path
+
+def get_cmd(src_path, target):
+    cmd = None
+    if target in ('facefeed', 'mmap', 'execve', 'dup', 'test'):
+        cmd = f'python run_{target}.py'
+    elif 'ablation' in target:
+        assert tool == 'ropbot'
+        path = os.path.join(src_path, "ropbot", target)
+        assert os.path.exists(path)
+        cmd = f'python {target}'
+    else:
+        assert target == 'riscyrop'
+        if tool == 'ropbot':
+            cmd = f'python run_{target}.py'
+        else:
+            assert tool == 'riscyrop'
+            if arch == 'riscv':
+                cmd = f'python run.py riscv64'
+            else:
+                cmd = f'python run.py aarch64'
+    assert cmd is not None
+    return cmd
+
+def run_docker(tool, arch, target, bin_folder, cmd):
+    name = f'{tool}_{arch}_{target}'.replace('/', '_')
+    if name.endswith('.py'):
+        name = name[:-3]
+    if target == 'test':
+        cmd = f"docker run --rm --name {name} -it -v {bin_folder}:/dataset {tool} {cmd}"
+    else:
+        cmd = f"docker run -d --name {name} -it -v {bin_folder}:/dataset {tool} {cmd}"
+    print(cmd)
+    os.system(cmd)
+
+if __name__ == '__main__':
+    import sys
+    if len(sys.argv) < 5:
+        print(f"usage: {sys.argv[0]} <dataset_dir> <tool> <arch> <target>")
+        exit()
+
+    dataset_dir = os.path.abspath(sys.argv[1])
+    tool = sys.argv[2]
+    arch = sys.argv[3]
+    target = sys.argv[4]
+    src_path = os.path.abspath(os.path.dirname(__file__))
+
+    sanitize_args(dataset_dir, tool, arch, target)
+
+    bin_folder = get_bin_folder(dataset_dir, arch, target)
+    cmd = get_cmd(src_path, target)
+
+    run_docker(tool, arch, target, bin_folder, cmd)
+

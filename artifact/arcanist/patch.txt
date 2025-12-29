@@ -1,0 +1,242 @@
+diff --git a/arcanist_tools/benchmark.py b/arcanist_tools/benchmark.py
+index 64e7188..752bc70 100644
+--- a/arcanist_tools/benchmark.py
++++ b/arcanist_tools/benchmark.py
+@@ -26,10 +26,15 @@ from pysmt.shortcuts import And
+ 
+ from arcanist.synthesizer.gadget import GadgetBase, GadgetLibrary, JSONGadget
+ 
++import angr
++angr.loggers.disable_root_logger()
++from pwnlib.elf import ELF
++
+ import logging
+ logging.basicConfig(level=logging.NOTSET,
+                     format="[%(levelname)s] (%(name)s) %(message)s")
+ LOGGER = logging.getLogger('arcanist-benchmark')
++LOGGER.setLevel("DEBUG")
+ 
+ 
+ # def random_gadgets(gadgets: List[JSONGadget], size: int, proportion_mem_store: float) -> List[JSONGadget]:
+@@ -100,11 +105,11 @@ def random_gadgets_json(gadgets: List[dict], size: int, proportion_mem_store: fl
+             filter(lambda g: g['has_store_operation'], gadgets))
+         without_mem_stores = list(filter(
+             lambda g: not g['has_store_operation'], gadgets))
+-        with_count = min(len(with_mem_stores), int(
+-            size * proportion_mem_store))
+-        without_count = size - with_count
+-        selected_gadgets += random.sample(population=without_mem_stores, k=without_count) + \
+-            random.sample(population=with_mem_stores, k=with_count)
++        with_count = min(len(with_mem_stores), int(size * proportion_mem_store))
++        without_count = min(len(without_mem_stores), size - with_count)
++        selected_gadgets += random.sample(population=without_mem_stores, k=without_count)
++        if with_count:
++            selected_gadgets += random.sample(population=with_mem_stores, k=with_count)
+ 
+     return selected_gadgets
+ 
+@@ -183,7 +188,12 @@ def make_memory_layout(args: Any) -> MemoryLayout:
+                               writable=False, name="shared-mem-pivot-buffer")
+         mem_layout.add_region(
+             0x8db5eac8, 0x8db5eaff, readable=True, writable=False, name="thread-stack-ro")
+-    elif args.goal.startswith("stack"):
++    elif args.goal.startswith("ropbot-arm"):
++        mem_layout.add_region(0x7ffde000, 0x7ffde07f,
++                              readable=True, writable=False, name="stack-ro")
++        mem_layout.add_region(0x7ffde080, 0x7fffefff,
++                              readable=True, writable=True, name="stack-rw")
++    elif args.goal.startswith("stack") or args.goal.startswith("ropbot"):
+         mem_layout.add_region(0x7ffffffde000, 0x7ffffffde07f,
+                               readable=True, writable=False, name="stack-ro")
+         mem_layout.add_region(0x7ffffffde080, 0x7fffffffefff,
+@@ -201,7 +211,7 @@ def make_memory_layout(args: Any) -> MemoryLayout:
+ 
+ 
+ def make_goal_assumptions(args: Any) -> Assumptions:
+-    is_stack_goal = args.goal.startswith("stack")
++    is_stack_goal = args.goal.startswith("stack") or args.goal.startswith("ropbot")
+     is_heap_goal = not is_stack_goal
+     valid_stack_region = 0x7ffffffde180
+     controlled_buffer = 0x7ffffffde000 if is_stack_goal else 0x7ffffff80000
+@@ -257,6 +267,52 @@ def make_goal_assumptions(args: Any) -> Assumptions:
+ 
+     return SimpleAssumptionFunction(_assumptions)
+ 
++def make_arm_assumptions(args: Any) -> Assumptions:
++    is_stack_goal = True
++    is_heap_goal = not is_stack_goal
++    valid_stack_region = 0x7ffde180
++    controlled_buffer = 0x7ffde000
++    controlled_size = 0x80 if is_stack_goal else 0x200
++
++    is_pivot_goal = 'stack-pivot' in args.goal
++    pivot_buffer = 0x7ff40000
++    pivot_buffer_size = 0x80
++
++    def is_in_controlled_buffer(val: fnode.FNode) -> fnode.FNode:
++        in_controlled_buffer = And(
++            [val >= controlled_buffer, val < controlled_buffer+controlled_size])
++        return in_controlled_buffer
++
++    def _assumptions(input_state: State) -> fnode.FNode:
++        memory = input_state.memory.clone_untainted().taint_range(
++            controlled_buffer, controlled_size)
++
++        # only use this pivot buffer for stack goal
++        # in heap goal pivot buffer is the controlled buffer
++        if is_pivot_goal and is_stack_goal:
++            # say that the pivot buffer is controlled
++            memory = memory.taint_range(pivot_buffer, pivot_buffer_size)
++
++        memory_assertions = input_state.memory.Equals(memory)
++        assertions = [memory_assertions]
++        for regname, reg in input_state.registers.items():
++            if regname == 'pc':
++                assertions.append(reg.taint)
++            elif regname == 'sp':
++                assertions.append(reg.Equals(
++                    TaintedBitvec.from_int(controlled_buffer, reg.bv_width)))
++            else:
++                assertions.append(reg.Equals(
++                    TaintedBitvec.new_zero_untainted(reg.bv_width)))
++
++        for flag in input_state.flags.values():
++            assertions.append(flag.Equals(TaintedBool.new_false_untainted()))
++
++        assumptions = And(assertions)
++        return assumptions
++
++    return SimpleAssumptionFunction(_assumptions)
++
+ 
+ def make_optee_cve_assumptions(args: Any) -> Assumptions:
+     def _assumptions(input_state: State) -> fnode.FNode:
+@@ -325,6 +381,10 @@ assumption_makers: Dict[str, Callable[[Any], Assumptions]] = {
+     "optee-cve-pivot": make_optee_cve_assumptions,
+     "optee-cve-func-call3": make_optee_cve_assumptions,
+     "optee-cve-func-call4": make_optee_cve_assumptions,
++    "ropbot-facefeed": make_goal_assumptions,
++    "ropbot-mmap": make_goal_assumptions,
++    "ropbot-execve": make_goal_assumptions,
++    "ropbot-arm-facefeed": make_arm_assumptions,
+ }
+ 
+ 
+@@ -389,7 +449,7 @@ def make_syscall_4args_specs(args: Any) -> Specifications:
+ 
+ 
+ def make_stack_pivot_specs(args: Any) -> Specifications:
+-    is_stack_goal = args.goal.startswith("stack")
++    is_stack_goal = args.goal.startswith("stack") or args.goal.startswith("ropbot")
+ 
+     def is_in_pivot_buffer(reg: TaintedBitvec):
+         # in stack scenario use the 'pivot-buffer'
+@@ -459,6 +519,74 @@ def make_optee_cve_func_call4_specs(args: Any) -> Specifications:
+         return assertions
+     return SimpleSpecificationFunction(_specifications)
+ 
++def make_ropbot_facefeed_specs(args: Any) -> Specifications:
++    def _specifications(_: State, output_state: State) -> Specifications:
++        rdi = output_state.registers['rdi']
++        rsi = output_state.registers['rsi']
++        rdx = output_state.registers['rdx']
++        rip = output_state.registers['rip']
++        rdi_is_arb = rdi.Equals(TaintedBitvec.from_int(0xdeadbeef, rdi.bv_width))
++        rsi_is_arb = rsi.Equals(TaintedBitvec.from_int(0x40, rsi.bv_width))
++        rdx_is_arb = rdx.Equals(TaintedBitvec.from_int(0x7b, rdx.bv_width))
++        rip_is_arb = rip.Equals(TaintedBitvec.from_int(0xfacefeed, rip.bv_width))
++        assertions = And([rdi_is_arb, rsi_is_arb, rdx_is_arb, rip_is_arb])
++        return assertions
++    return SimpleSpecificationFunction(_specifications)
++
++def make_ropbot_mmap_specs(args: Any) -> Specifications:
++    def _specifications(_: State, output_state: State) -> Specifications:
++        rdi = output_state.registers['rdi']
++        rsi = output_state.registers['rsi']
++        rdx = output_state.registers['rdx']
++        rcx = output_state.registers['rcx']
++        r8 = output_state.registers['r8']
++        r9 = output_state.registers['r9']
++        rip = output_state.registers['rip']
++        proj = angr.Project(args.path, load_options={'main_opts':{'base_addr': 0}})
++        mmap_addr = proj.loader.main_object.plt['mmap']
++        rdi_is_arb = rdi.Equals(TaintedBitvec.from_int(0x41414000, rdi.bv_width))
++        rsi_is_arb = rsi.Equals(TaintedBitvec.from_int(0x1000, rsi.bv_width))
++        rdx_is_arb = rdx.Equals(TaintedBitvec.from_int(0x7, rdx.bv_width))
++        rcx_is_arb = rdx.Equals(TaintedBitvec.from_int(0x32, rcx.bv_width))
++        r8_is_arb = rdx.Equals(TaintedBitvec.from_int(0xffffffffffffffff, r8.bv_width))
++        r9_is_arb = rdx.Equals(TaintedBitvec.from_int(0x0, r9.bv_width))
++        rip_is_arb = rip.Equals(TaintedBitvec.from_int(mmap_addr, rip.bv_width))
++        assertions = And([rdi_is_arb, rsi_is_arb, rdx_is_arb, rcx_is_arb, r8_is_arb, r9_is_arb, rip_is_arb])
++        return assertions
++    return SimpleSpecificationFunction(_specifications)
++
++def make_ropbot_execve_specs(args: Any) -> Specifications:
++    def _specifications(_: State, output_state: State) -> Specifications:
++        rax = output_state.registers['rax']
++        rdi = output_state.registers['rdi']
++        rsi = output_state.registers['rsi']
++        rdx = output_state.registers['rdx']
++        rip = output_state.registers['rip']
++        e = ELF(args.path)
++        syscall_addr = next(e.search(b'\x0f\x05', executable=True))
++        sh_addr = next(e.search(b'/bin/sh/\x00'))
++        rax_is_arb = rdi.Equals(TaintedBitvec.from_int(0x3b, rax.bv_width))
++        rdi_is_arb = rdi.Equals(TaintedBitvec.from_int(sh_addr, rdi.bv_width))
++        rsi_is_arb = rsi.Equals(TaintedBitvec.from_int(0, rsi.bv_width))
++        rdx_is_arb = rdx.Equals(TaintedBitvec.from_int(0, rdx.bv_width))
++        rip_is_arb = rip.Equals(TaintedBitvec.from_int(syscall_addr, rip.bv_width))
++        assertions = And([rax_is_arb, rdi_is_arb, rsi_is_arb, rdx_is_arb, rip_is_arb])
++        return assertions
++    return SimpleSpecificationFunction(_specifications)
++
++def make_ropbot_arm_facefeed_specs(args: Any) -> Specifications:
++    def _specifications(_: State, output_state: State) -> Specifications:
++        r0 = output_state.registers['r0']
++        r1 = output_state.registers['r1']
++        r2 = output_state.registers['r2']
++        pc = output_state.registers['pc']
++        r0_is_arb = r0.Equals(TaintedBitvec.from_int(0xdeadbeef, r0.bv_width))
++        r1_is_arb = r1.Equals(TaintedBitvec.from_int(0x40, r1.bv_width))
++        r2_is_arb = r2.Equals(TaintedBitvec.from_int(0x7b, r2.bv_width))
++        pc_is_arb = pc.Equals(TaintedBitvec.from_int(0xfacefeed, pc.bv_width))
++        assertions = And([r0_is_arb, r1_is_arb, r2_is_arb, pc_is_arb])
++        return assertions
++    return SimpleSpecificationFunction(_specifications)
+ 
+ specification_makers: Dict[str, Callable[[Any], Assumptions]] = {
+     "stack-func-call-3args": make_func_call_3args_specs,
+@@ -470,6 +598,10 @@ specification_makers: Dict[str, Callable[[Any], Assumptions]] = {
+     "optee-cve-pivot": make_optee_cve_pivot_specs,
+     "optee-cve-func-call3": make_optee_cve_func_call3_specs,
+     "optee-cve-func-call4": make_optee_cve_func_call4_specs,
++    "ropbot-facefeed": make_ropbot_facefeed_specs,
++    "ropbot-mmap": make_ropbot_mmap_specs,
++    "ropbot-execve": make_ropbot_execve_specs,
++    "ropbot-arm-facefeed": make_ropbot_arm_facefeed_specs,
+ }
+ 
+ 
+@@ -593,6 +725,7 @@ def main() -> None:
+     parser = argparse.ArgumentParser(
+         description="Benchmark ARCANIST performance and ability to find chains for specific goals")
+ 
++    parser.add_argument("path", help="Path to the target binary")
+     parser.add_argument("gadgets", help="Path to the JSON gadget library")
+     parser.add_argument(
+         "max_length", help="Max length of synthesized chain", type=int)
+@@ -645,6 +778,14 @@ def main() -> None:
+     )
+     goal_parsers.add_parser(
+         "stack-stack-pivot", help="Stack pivot (stack controlled)")
++    goal_parsers.add_parser(
++        "ropbot-facefeed", help="find a chain to invoke 0xfacefeed(0xdeadbeef, 0x40, 0x7b)")
++    goal_parsers.add_parser(
++        "ropbot-mmap", help="find a chain to invoke the mmap function")
++    goal_parsers.add_parser(
++        "ropbot-execve", help="find a chain to invoke an execve('/bin/sh', 0, 0) syscall chain")
++    goal_parsers.add_parser(
++        "ropbot-arm-facefeed", help="find a chain to invoke 0xfacefeed(0xdeadbeef, 0x40, 0x7b), but for arm")
+     heap_func_call_parser = goal_parsers.add_parser(
+         "heap-func-call-3args", help="Function call with 3 arguments (heap controlled)")
+     heap_func_call_parser.add_argument(

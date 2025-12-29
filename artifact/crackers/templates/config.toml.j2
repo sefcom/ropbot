@@ -1,0 +1,51 @@
+[meta]
+log_level = "INFO"
+seed = 0
+
+[specification]
+path = "{{ spec_path }}"
+max_instructions = 5
+
+[library]
+max_gadget_length = 10
+path = "{{ bin_path }}"
+
+[sleigh]
+ghidra_path = "/opt/ghidra"
+
+[synthesis]
+strategy = "sat"
+max_candidates_per_slot = 500
+parallel = {{ cpu_count }}
+combine_instructions = true
+
+[constraint.precondition.register]
+RAX = 0x7aaaaaaaaaaaaaaa
+RCX = 0x7aaaaaaaaaaaaaaa
+RDX = 0x7aaaaaaaaaaaaaaa
+RBX = 0x7aaaaaaaaaaaaaaa
+RSP = 0x7fffffffe3b8
+RBP = 0x7aaaaaaaaaaaaaaa
+RSI = 0x7aaaaaaaaaaaaaaa
+RDI = 0x7aaaaaaaaaaaaaaa
+R8 = 0x7aaaaaaaaaaaaaaa
+R9 = 0x7aaaaaaaaaaaaaaa
+R10 = 0x7aaaaaaaaaaaaaaa
+R11 = 0x7aaaaaaaaaaaaaaa
+R12 = 0x7aaaaaaaaaaaaaaa
+R13 = 0x7aaaaaaaaaaaaaaa
+R14 = 0x7aaaaaaaaaaaaaaa
+R15 = 0x7aaaaaaaaaaaaaaa
+
+[constraint.postcondition.register]
+RDI = 0xdeadbeef
+RSI = 0x40
+RDX = 0x7b
+
+[[constraint.pointer.read]]
+min = 0x7ffffffde000
+max = 0x7ffffffff000
+
+[[constraint.pointer.write]]
+min = 0x7ffffffde000
+max = 0x7ffffffff000

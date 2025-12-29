@@ -1,0 +1,4 @@
+angr
+angr_platforms @ https://github.com/angr/angr-platforms/archive/refs/heads/master.zip
+pypcode
+tqdm

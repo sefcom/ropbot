@@ -1,0 +1,42 @@
+# x64 eval
+./run <dataset> ropbot x64 facefeed
+./run <dataset> ropbot x64 mmap
+./run <dataset> ropbot x64 execve
+./run <dataset> ropbot x64 dup
+./run <dataset> exrop x64 facefeed
+./run <dataset> exrop x64 mmap
+./run <dataset> exrop x64 execve
+./run <dataset> exrop x64 dup
+./run <dataset> crackers x64 facefeed
+./run <dataset> crackers x64 mmap
+./run <dataset> crackers x64 execve
+./run <dataset> sgc x64 facefeed
+./run <dataset> sgc x64 mmap
+./run <dataset> sgc x64 execve
+
+# riscyrop eval
+./run <dataset> ropbot aarch64 riscyrop
+./run <dataset> ropbot riscv riscyrop
+./run <dataset> riscyrop aarch64 riscyrop
+./run <dataset> riscyrop riscv riscyrop
+
+# cross-arch eval
+./run <dataset> ropbot mipsel facefeed
+./run <dataset> ropbot aarch64 facefeed
+./run <dataset> ropbot arm facefeed
+./run <dataset> ropbot riscv facefeed
+
+# ablation study
+./run <dataset> ropbot x64 ablation/execve_base.py
+./run <dataset> ropbot x64 ablation/execve_graph_opt.py
+./run <dataset> ropbot x64 ablation/execve_no_concrete_values.py
+./run <dataset> ropbot x64 ablation/execve_no_jmp_mem.py
+./run <dataset> ropbot x64 ablation/execve_no_optimize.py
+./run <dataset> ropbot x64 ablation/facefeed_base.py
+./run <dataset> ropbot x64 ablation/facefeed_graph_opt.py
+./run <dataset> ropbot x64 ablation/facefeed_no_got.py
+./run <dataset> ropbot x64 ablation/facefeed_no_jmp_mem.py
+./run <dataset> ropbot x64 ablation/facefeed_no_multi_bb.py
+./run <dataset> ropbot x64 ablation/facefeed_no_ret2csu.py
+./run <dataset> ropbot x64 ablation/riscyrop_full.py
+./run <dataset> ropbot x64 ablation/riscyrop_no_cond_br.py

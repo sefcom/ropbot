@@ -1,0 +1,13 @@
+.intel_syntax noprefix
+
+.global _start
+
+_start:
+mov     rdi, 0x41414000
+mov     rsi, 0x1000
+mov     rdx, 0x7
+mov     rcx, 50
+mov     r8, -1
+mov     r9, 0
+mov     rax, {{ mmap_addr  }}
+jmp     rax

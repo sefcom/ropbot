@@ -1,0 +1,20 @@
+{
+    "executable": "{{ path }}",
+    "arch": "x86_64",
+    "load_address" : "0x000000",
+    "libraries": [],
+    "force_code_locations": [],
+    "preconditions": [
+                      ["IRDst", "{{ ret_addr }}", 64],
+                      ["RSP", "0x00007fffffffe498", 64]
+                  ],
+    "postconditions": [
+                      ["IRDst", "0xfacefeed", 64],
+                      ["RDI",  "0xdeadbeef", 64],
+                      ["RSI",  "0x40", 64],
+                      ["RDX",  "0x7b", 64]
+                  ],
+    "ptr_postconditions": [],
+    "read_mem_areas": [{{ read_seg_str }}],
+    "write_mem_areas": [{{ write_seg_str }}]
+}

@@ -32,6 +32,34 @@ If you'd like to use `angrop` on other architectures, please create an issue and
 
 The ROP analysis finds rop gadgets and can automatically build rop chains.
 
+## CLI
+angrop comes with a command line tool for easy day-to-day usage
+```bash
+# dump command will find gadgets in the target binary, true/false marks whether the gadget is self-contained
+$ angrop-cli dump /bin/ls
+0x11735: true  : adc bl, byte ptr [rbx + 0x4c]; mov eax, esp; pop r12; pop r13; pop r14; pop rbp; ret 
+0x10eaa: true  : adc eax, 0x12469; add rsp, 0x38; pop rbx; pop r12; pop r13; pop r14; pop r15; pop rbp; ret 
+00xe026: true  : adc eax, 0xcec8; pop rbx; cmove rax, rdx; pop r12; pop rbp; ret 
+00xdfd4: true  : adc eax, 0xcf18; pop rbx; cmove rax, rdx; pop r12; pop rbp; ret 
+00xdfa5: true  : adc eax, 0xcf4d; pop rbx; cmove rax, rdx; pop r12; pop rbp; ret 
+......
+
+# chain command will find some predefined chains in the binary
+$ angrop-cli chain -t execve /bin/bash
+code_base = 0x0
+chain = b""
+chain += p64(code_base + 0x36083)	# pop rax; pop rbx; pop rbp; ret 
+chain += p64(code_base + 0x30016)	# add rsp, 8; ret 
+chain += p64(code_base + 0x34873)
+chain += p64(code_base + 0x0)
+chain += p64(code_base + 0x9616d)	# mov edx, ebp; mov rsi, r12; mov rdi, rbx; call rax
+chain += p64(code_base + 0xe501e)	# pop rsi; ret 0
+chain += p64(code_base + 0x0)
+chain += p64(code_base + 0x31470)	# execve@plt
+chain += p64(0x0)
+chain += p64(code_base + 0x10d5bf)
+```
+
 ```python
 >>> import angr, angrop
 >>> p = angr.Project("/bin/ls")

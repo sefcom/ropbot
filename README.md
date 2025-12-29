@@ -6,6 +6,8 @@ In practice, it outperforms all state-of-the-art works in their own benchmarks i
 And it is the only tool that is proven to be scalable and work on large binaries such as `chromium` and `linux kernel`.
 
 This repository contains the source code of `ropbot` and all the artifact needed to replicate the results described in the paper.
+This repository serves as an archive of what was used in the paper and will not be updated.
+The active development of `ropbot` happens in the [angrop repo](https://github.com/angr/angrop)
 
 # Paper
 We describe our design and findings in this paper

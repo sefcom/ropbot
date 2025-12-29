@@ -19,10 +19,13 @@ Kyle Zeng, Moritz Schloegel, Christopher Salls, Adam Doupé, Ruoyu Wang, Yan Sho
 # Demo
 
 ## gadget finding
+![gadget](https://github.com/sefcom/ropbot/blob/master/gifs/find_gadget.gif?raw=true)
 
 ## find execve chain
+![execve](https://github.com/sefcom/ropbot/blob/master/gifs/execve.gif?raw=true)
 
 ## container escape chain for the kernel
+![kernel](https://github.com/sefcom/ropbot/blob/master/gifs/kernel.gif?raw=true)
 
 # Directories
 

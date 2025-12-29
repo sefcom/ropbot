@@ -1,8 +1,11 @@
-angrop
+angrop/ropbot
 ======
-# This is a private angrop fork for the angrop-paper, will be merged into angrop once it is published
 
-angrop is a rop gadget finder and chain builder
+# ropbot
+`ropbot` is a new version of `angrop`, initially called `angrop-ng`. So they are the same thing. It got renamed only for anonymization purpose for paper submission.
+
+# angrop
+angrop is a rop gadget finder and chain builder.
 
 ## Overview
 angrop is a tool to automatically generate rop chains.

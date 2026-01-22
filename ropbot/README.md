@@ -3,6 +3,7 @@ angrop/ropbot
 
 # ropbot
 `ropbot` is a new version of `angrop`, initially called `angrop-ng`. So they are the same thing. It got renamed only for anonymization purpose for paper submission.
+To reproduce the results mentioned in the paper, please refer to the [artifact folder](https://github.com/sefcom/ropbot/tree/master/artifact).
 
 # angrop
 angrop is a rop gadget finder and chain builder.

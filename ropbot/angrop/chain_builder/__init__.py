@@ -78,6 +78,8 @@ class ChainBuilder:
             raise RopException("ret2csu is currently implemented for AMD64")
         if len(args) != 3:
             raise RopException("ret2csu requires exactly three call arguments")
+        if not 0 <= args[0] <= 0xffffffff:
+            raise RopException("ret2csu first argument is loaded through edi and must fit 32 bits")
         chain = RopChain(self.project, self, badbytes=self.badbytes)
         values = [pop_gadget, index, index + 1, args[0], args[1], args[2], table,
                   call_gadget] + [0] * cleanup_slots
